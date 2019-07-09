@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <style>
+        canvas {
+            border:1px solid #d3d3d3;
+            background-color: #f1f1f1;
+        }
+    </style>
+</head>
+<body onload="startGame()">
+    <script>
+    var gamePieceArray = [];
+    var gfxArray = [];
+    var aiQueue = [];
+
+    var storedPiece;
+
+    var firstHealthBox;
+    var secondHealthBox;
+    var thirdHealthBox;
+    var fourthHealthBox;
+    var fifthHealthBox;
+
+    var dialogBox
+
+    var startXPos = 20;
+    var startYPos = 20;
+    var definition = 60;
+    var HeadPos = [
+    [0, 1, 2, 3, 4, 5, 6, 7, 8],
+    [0, 1, 2, 3, 4, 5, 6, 7, 8],
+    [0, 1, 2, 3, 4, 5, 6, 7, 8],
+    [0, 1, 2, 3, 4, 5, 6, 7, 8],
+    [0, 1, 2, 3, 4, 5, 6, 7, 8],
+    [0, 1, 2, 3, 4, 5, 6, 7, 8],
+    [0, 1, 2, 3, 4, 5, 6, 7, 8],
+    [0, 1, 2, 3, 4, 5, 6, 7, 8],
+    [0, 1, 2, 3, 4, 5, 6, 7, 8]
+    ];
+
+    function startGame() {
+        myGameArea.start();
+        do {
+            gamePieceArray.length = 0;
+            fillGrid();
+            var test = checkGrid(HeadPos);
+        } while (test);
+        dialogBox = new DialogBox(860, 120, 20, 600);
+        gfxArray.push(dialogBox);
+        firstHealthBox = new HealthBox(100, 20, 90, 740);
+        gfxArray.push(firstHealthBox);
+        secondHealthBox = new HealthBox(100, 20, 260, 740);
+        gfxArray.push(secondHealthBox);
+        thirdHealthBox = new HealthBox(100, 20, 430, 740);
+        gfxArray.push(thirdHealthBox);
+        fourthHealthBox = new HealthBox(100, 20, 600, 740);
+        gfxArray.push(fourthHealthBox);
+        fifthHealthBox = new HealthBox(100, 20, 770, 740);
+        gfxArray.push(fifthHealthBox);
+    }
+
+    var myGameArea = {
+        canvas : document.createElement("canvas"),
+        start : function() {
+            this.canvas.width = 900;
+            this.canvas.height = 800;
+            this.context = this.canvas.getContext("2d");
+            document.body.insertBefore(this.canvas, document.body.childNodes[0]);
+            this.canvas.addEventListener("click", captureGameClick);
+            this.frameNo = 0;
+            this.interval = setInterval(updateGameArea, 34);
+            },
+        clear : function() {
+            this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        },
+        stop : function() {
+            clearInterval(this.interval);
+        }
+    }
+
+    function captureGameClick() {
+        gamePieceArray.find(function (element) {
+            if (event.clientX > element.x && event.clientX < element.x + element.width && event.clientY > element.y && event.clientY < element.y + element.height) {
+                swapBoxes(element);
+                return true;
+            }
+        });
+    }
+
+    function swapBoxes(box) {
+        (async () => {
+            await Promise.all([
+                animateBoxdisappear(box),
+                animateBoxdisappear(storedPiece)
+            ]).then(perfSwap);
+            await Promise.all([
+                animateBoxappear(HeadPos[_gridPosX][_gridPosY]),
+                animateBoxappear(storedPiece)
+            ]);
+        });
+        var perfSwap = function () {
+            var storeX = storedPiece.x;
+            var storeY = storedPiece.y;
+            var _gridX = box.x;
+            var _gridY = box.y;
+            var _gridPosX = box.gridX;
+            var _gridPosY = box.gridY;
+            box.x = storeX;
+            box.y = storeY;
+            storedPiece.x = _gridX;
+            storedPiece.y = _gridY;
+            storedPiece.gridX = box.gridX;
+            storedPiece.gridY = box.gridY;
+            HeadPos[_gridPosX][_gridPosY] = storedPiece;
+            box.gridX = 1;
+            box.gridY = 11;
+            storedPiece = box;
+        }
+        var testValid = checkGrid(HeadPos);
+        if (testValid) {
+            AICheck("pre");
+            var filtGrid = filterGrid(HeadPos);
+            filterMainGrid(filtGrid);
+            myGameArea.canvas.removeEventListener("click", captureGameClick);
+            comboGrid().then(function (value) {
+                myGameArea.canvas.addEventListener("click", captureGameClick);
+                CalcAI();
+                AICheck("past");
+                console.log("move done");
+            });
+        }
+        else {
+            box = HeadPos[_gridPosX][_gridPosY];
+            var storeX = storedPiece.x;
+            var storeY = storedPiece.y;
+            var _gridX = box.x;
+            var _gridY = box.y;
+            box.x = storeX;
+            box.y = storeY;
+            storedPiece.x = _gridX;
+            storedPiece.y = _gridY;
+            storedPiece.gridX = box.gridX;
+            storedPiece.gridY = box.gridY;
+            HeadPos[box.gridX][box.gridY] = storedPiece;
+            box.gridX = 1;
+            box.gridY = 11;
+            storedPiece = box;
+            alert('invalid move!');
+        }
+    }
+
+    async function animateBoxdisappear(box) {
+        var time = setInterval(function () {
+            box.width -= 1;
+            box.height -= 1;
+            if (box.width <= 0) {
+                clearInterval(time);
+                return true;
+            }
+        }, 1000);
+    }
+
+    async function animateBoxappear(box) {
+        var time = setInterval(function () {
+            box.width += 1;
+            box.height += 1;
+            if (box.width >= 55) {
+                box.width = 55;
+                box.height = 55;
+                clearInterval(time);
+                return true;
+            }
+        }, 1000);
+    }
+
+    async function comboGrid() {
+        do {
+            for (var h = 0; h < 10; h++) {
+                clearGrid();
+                //await new Promise(resolve => setTimeout(resolve, 500));
+                //if (gamePieceArray.length == 82) { break; }
+            }
+            console.log('finished clearing');
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            var filtGrid = filterGrid(HeadPos);
+            filterMainGrid(filtGrid);
+        } while (checkGrid(HeadPos));
+        console.log('you can make the next move');
+        if (checkLossState()) {
+            console.log("lost the game");
+        }
+    }
+
+    function filterMainGrid(filtGrid) {
+        var comboGrid = [[1, "red"], [1, "blue"], [1, "green"], [1, "pink"], [1, "gray"]];
+        filtGrid.forEach(function (element) {
+            switch (element.color) {
+                case "red":
+                    addPoints("red", comboGrid[0][0]);
+                    comboGrid[0][0]++;
+                    break;
+                case "blue":
+                    addPoints("blue", comboGrid[1][0]);
+                    comboGrid[1][0]++;
+                    break;
+                case "green":
+                    addPoints("green", comboGrid[2][0]);
+                    comboGrid[2][0]++;
+                    break;
+                case "pink":
+                    addPoints("pink", comboGrid[3][0]);
+                    comboGrid[3][0]++;
+                    break;
+                case "gray":
+                    addPoints("gray", comboGrid[4][0]);
+                    comboGrid[4][0]++;
+                    break;
+            }
+        });
+        gamePieceArray.filter(function (gElement) {
+            filtGrid.forEach(function (element) {
+                if (gElement == element) {
+                    gElement.valid = false;
+                    return false;
+                }
+                else {
+                    return true;
+                }
+            });
+        });
+    }
+
+    function addPoints(color, combo) {
+        switch (color) {
+            case "red":
+                firstHealthBox.percentage += 0.001 * combo;
+                break;
+            case "blue":
+                secondHealthBox.percentage += 0.001 * combo;
+                break;
+            case "green":
+                thirdHealthBox.percentage += 0.001 * combo;
+                break;
+            case "pink":
+                fourthHealthBox.percentage += 0.001 * combo;
+                break;
+            case "gray":
+                fifthHealthBox.percentage += 0.001 * combo;
+                break;
+        }
+    }
+
+    function showMessage(character, text, displayTime) {
+        dialogBox.color = character;
+        dialogBox.currentText = text;
+        dialogBox.cooldown = displayTime;
+    }
+
+    function checkLossState() {
+        var tPosArr = [];
+
+        for (var i = 0; i < 9; i++) {
+            tPosArr[i] = HeadPos[i].slice();
+        }
+
+        for (var x = 0; x < 9; x++) {
+            for (var y = 0; y < 9; y++) {
+                var save = tPosArr[x][y];
+                tPosArr[x][y] = new component(55, 55, "purple", x, y, "rectangle");
+                if (checkGrid(tPosArr)) {
+                    return false;
+                }
+                else {
+                    tPosArr[x][y] = save;
+                }
+            }
+        }
+        return true;
+    }
+
+    function component(width, height, color, x, y, type) {
+        this.type = type;
+        this.color = color;
+        if (type == "image") {
+            this.image = new Image();
+            this.image.src = color;
+        }
+        this.width = width;
+        this.height = height;
+        this.speedX = 0;
+        this.speedY = 0;
+        this.gridX = x;
+        this.gridY = y;
+        this.valid = true;
+        this.x = startXPos + (x * definition);
+        this.y = startYPos + (y * definition);    
+        this.update = function() {
+            ctx = myGameArea.context;
+            if (type == "image") {
+                ctx.drawImage(this.image, 
+                    this.x, 
+                    this.y,
+                    this.width, this.height);
+            } else {
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+            }
+        };
+    }
+
+    function DialogBox(width, height, x, y) {
+        this.width = width;
+        this.height = height;
+        this.x = x;
+        this.y = y;
+        this.color = "black";
+        this.currentText = "You think you can pop me??";
+        this.avatar = new Image();
+        this.updateAvatar = function (src) {
+            this.avatar.src = src;
+        }
+        this.cooldown = 0;
+        this.update = function () {
+            var ctx = myGameArea.context;
+            ctx.strokeRect(this.x, this.y, this.width, this.height);
+            ctx.fillStyle = "black";
+            ctx.font = "30px Candara";
+            if (this.cooldown > 0) { ctx.fillText(this.currentText, this.x + 84, this.y + 50); }
+            this.cooldown--;
+        }
+    }
+
+    function HealthBox(width, height, x, y) {
+        this.width = width;
+        this.height = height;
+        this.x = x;
+        this.y = y;
+        this.percentage = 0;
+        this.update = function () {
+            var ctx = myGameArea.context;
+            var grad = ctx.createLinearGradient(this.x, 0, this.x + this.width, 0);
+            grad.addColorStop(0, "violet");
+            grad.addColorStop(0.5, "hotpink");
+            grad.addColorStop(1, "deeppink");
+            ctx.fillStyle = grad;
+            ctx.fillRect(this.x, this.y, this.width * this.percentage, this.height);
+            ctx.strokeRect(this.x, this.y, this.width, this.height);
+        }
+    }
+
+    function aiObject(time, power, mode, message, sender) {
+        this.time = time;
+        this.power = power;
+        this.mode = mode;
+        this.message = message;
+        this.sender = sender;
+        this.init = function () {
+            aiQueue.push(this);
+        }
+    }
+
+    function updateGameArea() {
+        myGameArea.clear();
+	    gamePieceArray.forEach(function(element) {
+		    element.update();
+        });
+        gfxArray.forEach(function (element) {
+            element.update();
+        })
+    }
+
+    function fillGrid() {
+        for (var x = 0; x < 9; x++) {
+            for (var y = 0; y < 9; y++) {
+                var color = randomHead(Math.floor(Math.random() * 5));
+                HeadPos[x][y] = new component(55, 55, color, x, y, "rectangle");
+                gamePieceArray.push(HeadPos[x][y]);
+            }
+        }
+        storedPiece = new component(55, 55, "purple", 11, 1, "rectangle");
+        gamePieceArray.push(storedPiece);
+    }
+
+    function randomHead(number) {
+        if (number == 0) {
+            return "red";
+        }
+        else if (number == 1) {
+            return "blue";
+        }
+        else if (number == 2) {
+            return "green";
+        }
+        else if (number == 3) {
+            return "pink";
+        }
+        else if (number == 4) {
+            return "gray";
+        }
+    }
+
+    function checkGrid(posArr) {
+        for (var x = 0; x < 9; x++) {
+            for (var y = 0; y < 9; y++) {
+                var filtArr = checkMatch(x, y, posArr);
+                if (filtArr.length != 0) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    function filterGrid(posArr) {
+        var invalElem = [];
+        for (var x = 0; x < 9; x++) {
+            for (var y = 0; y < 9; y++) {
+                if (posArr[x][y].valid == true) {
+                    checkMatch(x, y, posArr).forEach(function (element) {
+                        invalElem.push(element);
+                    });
+                }
+            }
+        }
+        return invalElem;
+    }
+
+    function checkMatch(x, y, posArr) {
+        var myColor = posArr[x][y].color;
+        var go = true;
+        var invalidPosArr = [];
+        var i = 1;
+        var tColor = myColor;
+        do {
+            if (x + i + 1 > 9) {
+                go = false;
+                i--;
+            }
+            else if (tColor == posArr[x + i][y].color || posArr[x + i][y].color == "purple" || tColor == "purple") {
+                if (posArr[x + i][y].color != "purple") { tColor = posArr[x + i][y].color; }
+                i++;
+            }
+            else {
+                go = false;
+                i--;
+            }
+        } while (go);
+        if (i >= 2) {
+            do {
+                invalidPosArr.push(posArr[x + i][y]);
+                i--;
+            } while (i >= 0);
+        }
+        go = true;
+        i = 1;
+        tColor = myColor;
+        do {
+            if (y + i + 1 > 9) {
+                go = false;
+                i--;
+            }
+            else if (tColor == posArr[x][y + i].color || posArr[x][y + i].color == "purple" || tColor == "purple") {
+                if (posArr[x][y + i].color != "purple") { tColor = posArr[x][y + i].color; }
+                i++;
+            }
+            else {
+                go = false;
+                i--;
+            }
+        } while (go);
+        if (i >= 2) {
+            do {
+                invalidPosArr.push(posArr[x][y + i]);
+                i--;
+            } while (i >= 0);
+        }
+        return invalidPosArr;
+    }
+
+    function animateFallingBlock(block) {
+        var locY = block.y;
+        var int = setInterval(function () {
+            block.y = block.y + 1;
+            if (block.y >= (locY + definition)) {
+                clearInterval(int);
+            }
+        }, 10);
+    }
+
+    function clearGrid() {
+        for (var x = 0; x < 9; x++) {
+            for (var y = 0; y < 9; y++) {
+                if (HeadPos[x][y].valid == false) {
+                    gamePieceArray = gamePieceArray.filter(function (element) {
+                        return element != HeadPos[x][y];
+                    });
+                    (async () => {
+                        await Promise.all([
+                            animateBoxdisappear(HeadPos[x][y])
+                        ]).then(result);
+                    });
+                    var result = function () {
+                        if (y == 0) {
+                        var color = randomHead(Math.floor(Math.random() * 5));
+                        HeadPos[x][y] = new component(55, 55, color, x, y, "rectangle");
+                        HeadPos[x][y].y -= 60;
+                        gamePieceArray.push(HeadPos[x][y]);
+                        animateFallingBlock(HeadPos[x][y]);
+                        }
+                        else {
+                            HeadPos[x][y] = new component(55, 55, HeadPos[x][y - 1].color, x, y, "rectangle");
+                            HeadPos[x][y - 1].valid = false;
+                            HeadPos[x][y].y -= 60;
+                            gamePieceArray.push(HeadPos[x][y]);
+                            animateFallingBlock(HeadPos[x][y]);
+                            gamePieceArray = gamePieceArray.filter(function (element) {
+                                return element != HeadPos[x][y - 1];
+                            });
+                        }
+                    }
+                    
+                }
+            }
+        }
+    }
+
+    var doOnce = false;
+
+    function CalcAI() {
+        if (firstHealthBox.percentage > 0.8 && doOnce == false) {
+            var ai = new aiObject("past", "swapBoxes", "swarm", "I can't take it any longer!!", "red");
+            ai.init();
+            doOnce = true;
+        }
+        if (thirdHealthBox.percentage > 0.001 && doOnce == false) {
+            var ai = new aiObject("past", "swapBoxes", "singleRandom", "Is this how you greet strangers in this land?", "green");
+            ai.init();
+            doOnce = true;
+        }
+    }
+
+    function AICheck(time) {
+        if (aiQueue.length == 0) { return null; }
+        var tPowerIdx = aiQueue.findIndex(function (element) {
+            return element.time == time;
+        });
+        var tPower = aiQueue.splice(tPowerIdx, 1).shift();
+        switch (tPower.power) {
+            case "swapBoxes":
+                switch (tPower.mode) {
+                    case "swarm":
+                        for (var i = 0; i < 12; i++) {
+                            let x = Math.floor(Math.random() * 8);
+                            let y = Math.floor(Math.random() * 8);
+                            swapBoxesColor(HeadPos[x][y], tPower.sender);
+                            HeadPos[x][y].color = tPower.sender;
+                        }
+                        swapBoxesColor(HeadPos[0][0], tPower.sender);
+                        swapBoxesColor(HeadPos[0][1], tPower.sender);
+                        swapBoxesColor(HeadPos[0][2], tPower.sender);
+                        showMessage(tPower.character, tPower.message, 3000);
+                        setTimeout(swapBoxes, 3000, storedPiece);
+                        break;
+                    case "singleRandom":
+                        let x = Math.floor(Math.random() * 8);
+                        let y = Math.floor(Math.random() * 8);
+                        let color = randomHead(Math.floor(Math.random() * 5));
+                        swapBoxesColor(HeadPos[x][y], color);
+                        showMessage(tPower.character, tPower.message, 3000);
+                }
+        }
+    }
+
+    function swapBoxesColor(boxCoord, swapColor) {
+        gamePieceArray = gamePieceArray.filter(function (element) {
+            return element != boxCoord;
+        });
+        boxCoord.color = swapColor;
+        gamePieceArray.push(boxCoord);
+
+    }
+
+    function swapBoxesToMatch(color) {
+        var tPosArr = [];
+        var possibleGrids = [];
+
+        for (var i = 0; i < 9; i++) {
+            tPosArr[i] = HeadPos[i].slice();
+        }
+
+        for (var x = 0; x < 9; x++) {
+            for (var y = 0; y < 9; y++) {
+                var save = tPosArr[x][y];
+                tPosArr[x][y].color = color;
+                if (checkGrid(tPosArr)) {
+                    possibleGrids.push([tPosArr[x][y], x, y]);
+                    tPosArr[x][y] = save;
+                }
+                else {
+                    tPosArr[x][y] = save;
+                }
+            }
+        }
+        var rand = Math.floor(Math.random() * possibleGrids.length);
+        var chosenBox = possibleGrids[rand];
+        gamePieceArray = gamePieceArray.filter(function (element) {
+            return element != chosenBox;
+        });
+        chosenBox.color = color;
+        gamePieceArray.push(chosenBox);
+    }
+    </script>
+
+    <p>The component constructor uses the built-in image object to draw images onto the canvas.</p>
+
+    <button onclick="clearGrid()">here</button>
+
+</body>
+</html>
