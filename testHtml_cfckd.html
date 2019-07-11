@@ -90,23 +90,13 @@
     }
 
     function swapBoxes(box) {
-        (async () => {
-            await Promise.all([
-                animateBoxdisappear(box),
-                animateBoxdisappear(storedPiece)
-            ]).then(perfSwap);
-            await Promise.all([
-                animateBoxappear(HeadPos[_gridPosX][_gridPosY]),
-                animateBoxappear(storedPiece)
-            ]);
-        });
+        var storeX = storedPiece.x;
+        var storeY = storedPiece.y;
+        var _gridX = box.x;
+        var _gridY = box.y;
+        var _gridPosX = box.gridX;
+        var _gridPosY = box.gridY;
         var perfSwap = function () {
-            var storeX = storedPiece.x;
-            var storeY = storedPiece.y;
-            var _gridX = box.x;
-            var _gridY = box.y;
-            var _gridPosX = box.gridX;
-            var _gridPosY = box.gridY;
             box.x = storeX;
             box.y = storeY;
             storedPiece.x = _gridX;
@@ -118,51 +108,65 @@
             box.gridY = 11;
             storedPiece = box;
         }
-        var testValid = checkGrid(HeadPos);
-        if (testValid) {
-            AICheck("pre");
-            var filtGrid = filterGrid(HeadPos);
-            filterMainGrid(filtGrid);
-            myGameArea.canvas.removeEventListener("click", captureGameClick);
-            comboGrid().then(function (value) {
-                myGameArea.canvas.addEventListener("click", captureGameClick);
-                CalcAI();
-                AICheck("past");
-                console.log("move done");
-            });
+        var perfTest = function () {
+            var testValid = checkGrid(HeadPos);
+            if (testValid) {
+                AICheck("pre");
+                var filtGrid = filterGrid(HeadPos);
+                filterMainGrid(filtGrid);
+                myGameArea.canvas.removeEventListener("click", captureGameClick);
+                comboGrid().then(function (value) {
+                    myGameArea.canvas.addEventListener("click", captureGameClick);
+                    CalcAI();
+                    AICheck("past");
+                });
+            }
+            else {
+                box = HeadPos[_gridPosX][_gridPosY];
+                var storeX = storedPiece.x;
+                var storeY = storedPiece.y;
+                var _gridX = box.x;
+                var _gridY = box.y;
+                box.x = storeX;
+                box.y = storeY;
+                storedPiece.x = _gridX;
+                storedPiece.y = _gridY;
+                storedPiece.gridX = box.gridX;
+                storedPiece.gridY = box.gridY;
+                HeadPos[box.gridX][box.gridY] = storedPiece;
+                box.gridX = 1;
+                box.gridY = 11;
+                storedPiece = box;
+                alert('invalid move!');
+            }
         }
-        else {
-            box = HeadPos[_gridPosX][_gridPosY];
-            var storeX = storedPiece.x;
-            var storeY = storedPiece.y;
-            var _gridX = box.x;
-            var _gridY = box.y;
-            box.x = storeX;
-            box.y = storeY;
-            storedPiece.x = _gridX;
-            storedPiece.y = _gridY;
-            storedPiece.gridX = box.gridX;
-            storedPiece.gridY = box.gridY;
-            HeadPos[box.gridX][box.gridY] = storedPiece;
-            box.gridX = 1;
-            box.gridY = 11;
-            storedPiece = box;
-            alert('invalid move!');
-        }
+        var animBoxes = async function () {
+            console.log("startAsync");
+            animateBoxdisappear(box);
+            animateBoxdisappear(storedPiece);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            perfSwap();
+            console.log("first await completed");
+            animateBoxappear(HeadPos[_gridPosX][_gridPosY]);
+            animateBoxappear(storedPiece);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            console.log("second await completed");
+            perfTest();
+        };
+        animBoxes();
     }
 
-    async function animateBoxdisappear(box) {
+    function animateBoxdisappear(box) {
         var time = setInterval(function () {
             box.width -= 1;
             box.height -= 1;
             if (box.width <= 0) {
                 clearInterval(time);
-                return true;
             }
-        }, 1000);
+        }, 10);
     }
 
-    async function animateBoxappear(box) {
+    function animateBoxappear(box) {
         var time = setInterval(function () {
             box.width += 1;
             box.height += 1;
@@ -170,9 +174,8 @@
                 box.width = 55;
                 box.height = 55;
                 clearInterval(time);
-                return true;
             }
-        }, 1000);
+        }, 10);
     }
 
     async function comboGrid() {
@@ -490,37 +493,30 @@
     }
 
     function clearGrid() {
-        for (var x = 0; x < 9; x++) {
-            for (var y = 0; y < 9; y++) {
+        for (var x = 0; x < 8; x++) {
+            for (var y = 0; y < 8; y++) {
                 if (HeadPos[x][y].valid == false) {
+                    //animateBoxdisappear(HeadPos[x][y]);
                     gamePieceArray = gamePieceArray.filter(function (element) {
                         return element != HeadPos[x][y];
                     });
-                    (async () => {
-                        await Promise.all([
-                            animateBoxdisappear(HeadPos[x][y])
-                        ]).then(result);
-                    });
-                    var result = function () {
-                        if (y == 0) {
-                        var color = randomHead(Math.floor(Math.random() * 5));
-                        HeadPos[x][y] = new component(55, 55, color, x, y, "rectangle");
+                    if (y == 0) {
+                    var color = randomHead(Math.floor(Math.random() * 5));
+                    HeadPos[x][y] = new component(55, 55, color, x, y, "rectangle");
+                    HeadPos[x][y].y -= 60;
+                    gamePieceArray.push(HeadPos[x][y]);
+                    animateFallingBlock(HeadPos[x][y]);
+                    }
+                    else {
+                        HeadPos[x][y] = new component(55, 55, HeadPos[x][y - 1].color, x, y, "rectangle");
+                        HeadPos[x][y - 1].valid = false;
                         HeadPos[x][y].y -= 60;
                         gamePieceArray.push(HeadPos[x][y]);
                         animateFallingBlock(HeadPos[x][y]);
-                        }
-                        else {
-                            HeadPos[x][y] = new component(55, 55, HeadPos[x][y - 1].color, x, y, "rectangle");
-                            HeadPos[x][y - 1].valid = false;
-                            HeadPos[x][y].y -= 60;
-                            gamePieceArray.push(HeadPos[x][y]);
-                            animateFallingBlock(HeadPos[x][y]);
-                            gamePieceArray = gamePieceArray.filter(function (element) {
-                                return element != HeadPos[x][y - 1];
-                            });
-                        }
+                        gamePieceArray = gamePieceArray.filter(function (element) {
+                            return element != HeadPos[x][y - 1];
+                        });
                     }
-                    
                 }
             }
         }
